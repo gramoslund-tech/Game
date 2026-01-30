@@ -1,0 +1,103 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
+/* * PROJECT: THE GLITCH (Mobile Horror)
+ * GitHub-Ready Source Code
+ * Includes: Touch Controls, Power System, Night 4 Hacking, and Night 5 Escape
+ */
+
+public class GlitchGameManager : MonoBehaviour {
+    [Header("MOBILE CONTROLS")]
+    public float lookSensitivity = 0.15f;
+    private Vector2 touchOrigin;
+
+    [Header("POWER SYSTEM")]
+    public float totalPower = 100f;
+    public float doorDrainRate = 1.5f;
+    public Text powerText;
+    public GameObject blackoutOverlay;
+
+    [Header("DOORS & HACKING")]
+    public bool isHacked = false; 
+    public GameObject leftDoor;
+    public GameObject rightDoor;
+    public Image hackOverlay;
+
+    [Header("NIGHT 5 FINALE")]
+    public bool isNight5 = false;
+    public int fusesFound = 0;
+    public int totalFusesNeeded = 3;
+    public Text missionText;
+    public LayerMask fuseLayer;
+
+    [Header("ENEMIES & JUMPSCARES")]
+    public GameObject jumpscareUI;
+    public AudioSource jumpscareSound;
+
+    void Update() {
+        if (totalPower > 0) {
+            HandleTouchLook();
+            if (!isNight5) ManagePower();
+            else HandleScavengerHunt();
+            
+            if (isHacked && hackOverlay != null) {
+                hackOverlay.enabled = (Time.time % 0.4f > 0.2f);
+            }
+        } else {
+            TriggerBlackout();
+        }
+    }
+
+    void HandleTouchLook() {
+        if (Input.touchCount > 0) {
+            Touch t = Input.GetTouch(0);
+            if (t.phase == TouchPhase.Began) touchOrigin = t.position;
+            else if (t.phase == TouchPhase.Moved) {
+                float rotY = (t.position.x - touchOrigin.x) * lookSensitivity;
+                transform.Rotate(0, rotY, 0);
+            }
+        }
+    }
+
+    void ManagePower() {
+        float currentDrain = 0.1f;
+        if (leftDoor.activeSelf) currentDrain += doorDrainRate;
+        if (rightDoor.activeSelf) currentDrain += doorDrainRate;
+        totalPower -= currentDrain * Time.deltaTime;
+        if (powerText != null) powerText.text = "Power: " + Mathf.CeilToInt(totalPower) + "%";
+    }
+
+    void TriggerBlackout() {
+        totalPower = 0;
+        leftDoor.SetActive(false);
+        rightDoor.SetActive(false);
+        if (blackoutOverlay != null) blackoutOverlay.SetActive(true);
+    }
+
+    public void OnDoorButton(string side) {
+        if (totalPower <= 0) return;
+        if (isHacked) {
+            if (side == "Left") ToggleDoor("Right");
+            else ToggleDoor("Left");
+        } else {
+            ToggleDoor(side);
+        }
+    }
+
+    void ToggleDoor(string side) {
+        if (side == "Left") leftDoor.SetActive(!leftDoor.activeSelf);
+        else if (side == "Right") rightDoor.SetActive(!rightDoor.activeSelf);
+    }
+
+    void HandleScavengerHunt() {
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began) {
+            Ray ray = Camera.main.ScreenPointToRay(Input.GetTouch(0).position);
+            if (Physics.Raycast(ray, out RaycastHit hit, 3f, fuseLayer)) {
+                fusesFound++;
+                Destroy(hit.collider.gameObject);
+                if (fusesFound >= totalFusesNeeded) missionText.text = "EXIT OPEN!";
+            }
+        }
+    }
+}
